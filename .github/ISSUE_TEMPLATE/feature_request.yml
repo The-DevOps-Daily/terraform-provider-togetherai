@@ -1,0 +1,55 @@
+name: Feature request
+description: Suggest a provider feature or improvement.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem you want to solve and how the feature would help.
+        Never paste API keys in an issue. Remove secrets, kubeconfigs and private data from all examples and logs.
+  - type: input
+    id: terraform-version
+    attributes:
+      label: Terraform version
+      description: Run terraform version, or write not applicable.
+    validations:
+      required: true
+  - type: input
+    id: provider-version
+    attributes:
+      label: Provider version
+      description: Include the commit ID for a local build, or write not applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What problem would this feature solve?
+    validations:
+      required: true
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Configuration snippet
+      description: Show current or proposed Terraform configuration if useful. Remove API keys, kubeconfigs and other secrets.
+      render: hcl
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Describe how you want the provider to behave.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Describe the current limitation and any workaround.
+    validations:
+      required: true
+  - type: textarea
+    id: debug-output
+    attributes:
+      label: Debug output
+      description: Optional, if this request relates to an error. Remove secrets, authorization headers, kubeconfigs and private data from TF_LOG=DEBUG output. Do not attach Terraform state.
+      render: text

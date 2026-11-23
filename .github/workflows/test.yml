@@ -1,0 +1,106 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: Go vulnerability check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+          cache: true
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+          cache: true
+      # The mock acceptance tests run the real Terraform CLI against an
+      # in-process mock of the Together AI API.
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+      - run: go mod download
+      - run: go build ./...
+      - run: go vet ./...
+      - name: Unit and mock acceptance tests
+        env:
+          TF_ACC: "1"
+          CHECKPOINT_DISABLE: "1"
+        # No TOGETHER_API_KEY here, so the real-API TestAcc* tests skip.
+        run: go test ./... -count=1 -timeout 600s
+
+  examples:
+    name: Examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+          cache: true
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+      # Validates every example against this build, then plans them against
+      # the mock API.
+      - name: Validate and plan examples
+        env:
+          MOCK: "1"
+        run: sh scripts/check-examples.sh
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+          cache: true
+      # Run golangci-lint with `go run` so it is built with the module's Go
+      # version; prebuilt binaries can lag it and refuse to load the config.
+      - name: golangci-lint
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
+      - name: gofmt
+        run: test -z "$(gofmt -s -l .)" || (gofmt -s -l . && exit 1)
+
+  docs:
+    name: Docs up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+          cache: true
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+      - run: go tool tfplugindocs generate --provider-name togetherai
+      - name: Check docs are committed
+        run: |
+          if [ -n "$(git status --porcelain docs/)" ]; then
+            echo "docs/ is out of date. Run 'make docs' and commit the result."
+            git diff docs/
+            exit 1
+          fi
